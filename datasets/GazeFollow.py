@@ -272,6 +272,7 @@ class GazeFollow(Dataset):
         gaze_heatmap /= num_valid
 
         return (
+            path,
             img,
             depth,
             face,

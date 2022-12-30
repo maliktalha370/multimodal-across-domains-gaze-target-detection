@@ -22,7 +22,7 @@ def get_config():
     parser.add_argument(
         "--source_dataset_dir",
         type=str,
-        default="/datasets/gazefollow_extended",
+        default="../../dataset/depth/gazefollow_extended/",
         help="directory where the source dataset is located",
     )
     parser.add_argument(
@@ -34,7 +34,7 @@ def get_config():
     parser.add_argument(
         "--target_dataset_dir",
         type=str,
-        default="/datasets/gazefollow_extended",
+        default="../../dataset/depth/gazefollow_extended/",
         help="directory where the target dataset is located",
     )
     parser.add_argument(

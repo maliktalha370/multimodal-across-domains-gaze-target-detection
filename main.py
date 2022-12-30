@@ -9,6 +9,7 @@ import torch.nn as nn
 from dotenv import load_dotenv
 from joblib import Parallel, delayed
 from skimage.transform import resize
+# from cv2 import resize  
 from timm.utils import AverageMeter
 from torchvision.transforms import transforms
 

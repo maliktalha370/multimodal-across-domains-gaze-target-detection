@@ -8,11 +8,12 @@ from .VideoAttentionTarget import VideoAttentionTargetImages
 
 
 def get_loader(name: str, root_dir: str, input_size=224, output_size=64, batch_size=48, num_workers=6, is_train=True):
+
     if name == "gazefollow":
         labels = os.path.join(root_dir, "train_annotations_release.txt" if is_train else "test_annotations_release.txt")
         dataset = GazeFollow(root_dir, labels, input_size=input_size, output_size=output_size, is_test_set=not is_train)
         loader = DataLoader(
-            dataset=dataset, batch_size=batch_size, shuffle=is_train, num_workers=num_workers, pin_memory=True
+            dataset=dataset, batch_size=batch_size, shuffle=is_train, num_workers=0, pin_memory=True
         )
     elif name == "videoattentiontarget":
         labels = os.path.join(root_dir, "annotations/train" if is_train else "annotations/test")
