@@ -282,7 +282,7 @@ class GazeFollow(Dataset):
             gaze_coords,
             gaze_inside,
             torch.IntTensor([width, height]),
-            path,
+            [x_min, y_min, x_max, y_max]
         )
 
     def get_head_coords(self, path):

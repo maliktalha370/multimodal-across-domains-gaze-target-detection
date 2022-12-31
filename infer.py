@@ -2,7 +2,7 @@ import multiprocessing
 import os
 import random
 from datetime import datetime
-
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
@@ -54,9 +54,9 @@ def main(config):
 
 
     # Get loss functions
-    mse_loss = nn.MSELoss(reduction="none")
-    adv_loss = nn.NLLLoss()
-    multimodal_loss = nn.MSELoss(reduction="none")
+    # mse_loss = nn.MSELoss(reduction="none")
+    # adv_loss = nn.NLLLoss()
+    # multimodal_loss = nn.MSELoss(reduction="none")
 
     # Get optimizer
     optimizer = get_optimizer(model, lr=config.lr)
@@ -96,7 +96,7 @@ def evaluate(config, model, device, loader):
                 gaze_coords,
                 _,
                 img_size,
-                _,
+                head_bbox
             ) = data
             images = images.to(device, non_blocking=True, memory_format=get_memory_format(config))
             depths = depths.to(device, non_blocking=True, memory_format=get_memory_format(config))
@@ -114,7 +114,8 @@ def evaluate(config, model, device, loader):
             n_jobs = max(1, min(multiprocessing.cpu_count(), 8, config.batch_size))
             metrics = Parallel(n_jobs=n_jobs)(
                 delayed(evaluate_one_item)(path[b_i], batch, b_i, images[b_i].cpu().numpy(),
-                    gaze_heatmap_pred[b_i],output_size,config
+                    gaze_heatmap_pred[b_i],output_size,config,
+                    [head_bbox[0][b_i], head_bbox[1][b_i], head_bbox[2][b_i], head_bbox[3][b_i]]
                 )
                 for b_i in range(len(gaze_coords))
             )
@@ -159,19 +160,30 @@ def evaluate_one_item(path,
                       b_i, img,
     gaze_heatmap_pred,
     output_size,
-    config
+    config,
+    head_bbox,
                       
 ):
-    print('path' , path)
+    print('path in 1' , path)
     new_img = cv2.imread(join(config.target_dataset_dir, path))
     # Min distance: minimum among all possible pairs of <ground truth point, predicted point>
     pred_x, pred_y = get_heatmap_peak_coords(gaze_heatmap_pred)
     norm_p = torch.tensor([pred_x / float(output_size), pred_y / float(output_size)])
     norm_p_np = norm_p.numpy()
-    print('conv ', (int(norm_p_np[0] * new_img.shape[2]), int(norm_p_np[1] * new_img.shape[1])))
-    
-    cv2.circle(new_img, (int(norm_p_np[0] * new_img.shape[1]), int(norm_p_np[1] * new_img.shape[0])), int(new_img.shape[1] / 50.0),  (255,0,0), -1)
-    # cv2.imwrite('output/' + str(batch_no) + '_' + str(b_i) + '.jpg', new_img)
+    converted = []
+    for data in head_bbox:
+        converted.append(int(data.numpy()))
+    dst = cv2.cvtColor(new_img, cv2.COLOR_BGR2RGB)
+    cv2.rectangle(dst, (converted[0], converted[1]),
+                  (converted[2], converted[3]),
+                  (255, 0, 0), 2)
+    cv2.circle(dst, (int(norm_p_np[0] * new_img.shape[1]), int(norm_p_np[1] * new_img.shape[0])),
+               int(new_img.shape[1] / 50.0), (255, 0, 0), -1)
+
+    # plt.imshow(dst, cmap='gray')
+    # plt.show()
+
+    cv2.imwrite('output/' + str(batch_no) + '_' + str(b_i) + '.jpg', dst)
     # print(np.multiply(norm_p.numpy(), img_shape[1:]))
     
     # print('New Iter' , norm_p)
