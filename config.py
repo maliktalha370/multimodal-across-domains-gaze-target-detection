@@ -22,7 +22,7 @@ def get_config():
     parser.add_argument(
         "--source_dataset_dir",
         type=str,
-        default="../../dataset/depth/gazefollow_extended/",
+        default="../../dataset/gazefollow/",
         help="directory where the source dataset is located",
     )
     parser.add_argument(
@@ -34,7 +34,7 @@ def get_config():
     parser.add_argument(
         "--target_dataset_dir",
         type=str,
-        default="../../dataset/depth/gazefollow_extended/",
+        default="../../dataset/gazefollow/",
         help="directory where the target dataset is located",
     )
     parser.add_argument(
@@ -76,7 +76,8 @@ def get_config():
         action="store_true",
         help="Do not save checkpoint every {save_every}. Stores last checkpoint only to allow resuming",
     )
-
+    parser.add_argument('--elm_frame', type=str, help='images', default='data/gaze_follow_test/frames')
+    parser.add_argument('--elm_head', type=str, help='head bounding boxes', default='data/gaze_follow_test/test.txt')
     args = parser.parse_args()
 
     # Update output dir
