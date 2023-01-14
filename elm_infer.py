@@ -2,6 +2,7 @@ import os
 import cv2
 import torch
 import random
+import argparse
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -13,12 +14,8 @@ try:
 except ImportError:
     print("AMP is not available")
 
-# from optimizer import get_optimizer
 from torchvision.transforms import transforms
 
-
-
-from config import get_config
 from utils import (
     get_heatmap_peak_coords,
     get_memory_format,
@@ -55,9 +52,6 @@ class Inference:
         print("Loading model")
         model = get_model(self.config, device=self.device)
 
-        # # Get optimizer
-        # optimizer = get_optimizer(model, lr=self.config.lr)
-        # optimizer.zero_grad()
 
         # Do an evaluation or continue and prepare training
         # if config.eval_weights:
@@ -68,90 +62,7 @@ class Inference:
 
         self.model = load_pretrained(model, pretrained_dict)
         self.model.eval()
-    def run_overVideo(self):
-        self.csv_path = self.config.elm_head
-        self.data_dir = self.config.elm_frame
-        column_names = [
-            "path",
-            "left",
-            "top",
-            "right",
-            "bottom"]
 
-
-        df = pd.read_csv(self.csv_path, sep=",", names=column_names, usecols=column_names, index_col=False)
-        for i in df.index:
-
-
-
-            path = df.loc[i, 'path']
-            x_min = df.loc[i,'left']
-            y_min = df.loc[i,'top']
-            x_max = df.loc[i,'right']
-            y_max = df.loc[i,'bottom']
-
-            img = Image.open(os.path.join(self.config.elm_frame, path))
-            img = img.convert("RGB")
-            img_cp = np.array(img.copy())
-            width, height = img.size
-
-            # Expand face bbox a bit
-            x_min -= self.head_bbox_overflow_coeff * abs(x_max - x_min)
-            y_min -= self.head_bbox_overflow_coeff * abs(y_max - y_min)
-            x_max += self.head_bbox_overflow_coeff * abs(x_max - x_min)
-            y_max += self.head_bbox_overflow_coeff * abs(y_max - y_min)
-
-            x_min, y_min, x_max, y_max = map(float, [x_min, y_min, x_max, y_max])
-
-            head = get_head_mask(x_min, y_min, x_max, y_max, width, height, resolution=self.input_size).unsqueeze(0)
-
-            # Crop the face
-            face = img.crop((int(x_min), int(y_min), int(x_max), int(y_max)))
-
-            # Load depth image
-            depth_path = path.replace("images", "depth")
-            depth = Image.open(os.path.join(self.data_dir, depth_path))
-            depth = depth.convert("L")
-
-            # Apply transformation to images...
-            if self.image_transform is not None:
-                img = self.image_transform(img)
-                face = self.image_transform(face)
-
-            # ... and depth
-            if self.depth_transform is not None:
-                depth = self.depth_transform(depth)
-
-            img = img.to(self.device, non_blocking=True, memory_format=get_memory_format(self.config)).unsqueeze(0)
-            depth = depth.to(self.device, non_blocking=True, memory_format=get_memory_format(self.config)).unsqueeze(0)
-            face = face.to(self.device, non_blocking=True, memory_format=get_memory_format(self.config)).unsqueeze(0)
-            head = head.to(self.device, non_blocking=True, memory_format=get_memory_format(self.config)).unsqueeze(0)
-
-            gaze_heatmap_pred, _, _, _ = self.model(img, depth, head, face)
-
-            gaze_heatmap_pred = gaze_heatmap_pred.squeeze(1).cpu()
-
-            # gaze_heatmap_pred = gaze_heatmap_pred.squeeze(1).cpu()
-            pred_x, pred_y = get_heatmap_peak_coords(gaze_heatmap_pred[0])
-            norm_p = torch.tensor([pred_x / float(self.config.output_size), pred_y / float(self.config.output_size)])
-            norm_p_np = norm_p.numpy()
-            converted = list(map(int, [x_min, y_min, x_max, y_max]))
-
-            dst = cv2.cvtColor(img_cp, cv2.COLOR_BGR2RGB)
-            cv2.rectangle(dst, (converted[0], converted[1]),
-                          (converted[2], converted[3]),
-                          (255, 0, 0), 2)
-            cv2.circle(dst, (int(norm_p_np[0] * img_cp.shape[1]), int(norm_p_np[1] * img_cp.shape[0])),
-                       int(img_cp.shape[1] / 50.0), (255, 0, 0), -1)
-
-            starting_point = ((converted[0] + converted[2]) // 2, (converted[1] + converted[3]) // 2)
-            ending_point = (int(norm_p[0] * img_cp.shape[1]), int(norm_p[1] * img_cp.shape[0]))
-            cv2.line(dst, starting_point, ending_point, (255, 0, 0), 5)
-
-            screen = cv2.cvtColor(dst, cv2.COLOR_RGB2BGR)
-            plt.imshow(screen, cmap='gray')
-            plt.show()
-            # cv2.imwrite('results/VideoAtten/' + str(batch_no) + '_' + str(b_i) + '.jpg', screen)
 
     def run_overSingleFrame(self, img, depth, head_bbox):
 
@@ -208,17 +119,38 @@ class Inference:
 
         return starting_point, ending_point
 
+def get_config():
+    parser = argparse.ArgumentParser()
+    # Dataset args
+    parser.add_argument("--input_size", type=int, default=224, help="input size")
+    parser.add_argument("--output_size", type=int, default=64, help="output size")
+    parser.add_argument("--batch_size", type=int, default=48, help="batch size")
+    parser.add_argument("--eval_weights", type=str, help="If set, performs evaluation only")
+    parser.add_argument("--head_da", default=False, action="store_true", help="Do DA on head backbone")
+    parser.add_argument("--rgb_depth_da", default=False, action="store_true", help="Do DA on rgb/depth backbone")
+    parser.add_argument("--channels_last", default=False, action="store_true")
+    parser.add_argument("--freeze_scene", default=False, action="store_true", help="Freeze the scene backbone")
+    parser.add_argument("--freeze_face", default=False, action="store_true", help="Freeze the head backbone")
+    parser.add_argument("--freeze_depth", default=False, action="store_true", help="Freeze the depth backbone")
+    args = parser.parse_args()
 
+    # Print configuration
+    print(vars(args))
+    print()
+
+    return args
 if __name__ == "__main__":
+
     # Make runs repeatable as much as possible
     torch.manual_seed(1)
     random.seed(1)
     np.random.seed(1)
     load_dotenv()
     obj = Inference()
-    cnf = get_config()
-    csv_path = cnf.elm_head
-    data_dir = cnf.elm_frame
+
+    data_dir = '../../dataset/subsample/images'
+    csv_path = '../../dataset/subsample/person1.txt'
+
     column_names = [
         "path",
         "left",
@@ -229,7 +161,7 @@ if __name__ == "__main__":
     df = pd.read_csv(csv_path, sep=",", names=column_names, usecols=column_names, index_col=False)
     for i in df.index:
         path = df.loc[i, 'path']
-        img = Image.open(os.path.join(cnf.elm_frame, path))
+        img = Image.open(os.path.join(data_dir, path))
         depth_path = path.replace("images", "depth")
         depth = Image.open(os.path.join(data_dir, depth_path))
         head_bbox = [df.loc[i, 'left'], df.loc[i, 'top'], df.loc[i, 'right'],df.loc[i, 'bottom']]
