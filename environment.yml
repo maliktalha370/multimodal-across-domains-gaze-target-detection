@@ -1,4 +1,4 @@
-name: multimodal-across-domains-gaze-target-detection
+name: talha_2
 channels:
   - pytorch
   - defaults
