@@ -291,6 +291,7 @@ class VideoAttentionTargetImages(Dataset):
         gaze_coords = (gaze_x, gaze_y)
 
         return (
+            path,
             img,
             depth,
             face,
@@ -300,5 +301,5 @@ class VideoAttentionTargetImages(Dataset):
             torch.FloatTensor([gaze_coords]),
             torch.IntTensor([gaze_inside]),
             torch.IntTensor([width, height]),
-            path,
+            [x_min, y_min, x_max, y_max]
         )
