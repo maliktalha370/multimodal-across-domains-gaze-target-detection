@@ -125,7 +125,9 @@ def get_config():
     parser.add_argument("--input_size", type=int, default=224, help="input size")
     parser.add_argument("--output_size", type=int, default=64, help="output size")
     parser.add_argument("--batch_size", type=int, default=48, help="batch size")
-    parser.add_argument("--eval_weights", type=str, help="If set, performs evaluation only")
+    parser.add_argument("--eval_weights", type=str,
+                        default= './output/spatial_depth_late_fusion_gazefollow_gazefollow/default/ckpt_epoch_41.pth',
+                        help="If set, performs evaluation only")
     parser.add_argument("--head_da", default=False, action="store_true", help="Do DA on head backbone")
     parser.add_argument("--rgb_depth_da", default=False, action="store_true", help="Do DA on rgb/depth backbone")
     parser.add_argument("--channels_last", default=False, action="store_true")
