@@ -322,6 +322,7 @@ $RECYCLE.BIN/
 
 # Model weights
 *.pt
+*.pth
 
 # Additional .idea files
 .idea/deployment.xml
@@ -335,3 +336,5 @@ $RECYCLE.BIN/
 output/
 pretrained/
 !/pretrained/.gitkeep
+
+*.jpg
