@@ -8,6 +8,7 @@ import pandas as pd
 from PIL import Image
 import matplotlib.pyplot as plt
 from dotenv import load_dotenv
+from config import get_config
 try:
     # noinspection PyUnresolvedReferences
     from apex import amp
@@ -25,7 +26,7 @@ from models import get_model, load_pretrained
 from datasets.transforms.ToColorMap import ToColorMap
 
 class Inference:
-    def __init__(self):
+    def __init__(self, MODEL_PATH):
         self.config = get_config()
 
 
@@ -57,7 +58,7 @@ class Inference:
         # if config.eval_weights:
         print("Preparing evaluation")
 
-        pretrained_dict = torch.load(self.config.eval_weights, map_location=self.device)
+        pretrained_dict = torch.load(MODEL_PATH, map_location=self.device)
         pretrained_dict = pretrained_dict.get("model_state_dict") or pretrained_dict.get("model")
 
         self.model = load_pretrained(model, pretrained_dict)
@@ -119,28 +120,8 @@ class Inference:
 
         return starting_point, ending_point
 
-def get_config():
-    parser = argparse.ArgumentParser()
-    # Dataset args
-    parser.add_argument("--input_size", type=int, default=224, help="input size")
-    parser.add_argument("--output_size", type=int, default=64, help="output size")
-    parser.add_argument("--batch_size", type=int, default=48, help="batch size")
-    parser.add_argument("--eval_weights", type=str,
-                        default= './output/spatial_depth_late_fusion_gazefollow_gazefollow/default/ckpt_epoch_41.pth',
-                        help="If set, performs evaluation only")
-    parser.add_argument("--head_da", default=False, action="store_true", help="Do DA on head backbone")
-    parser.add_argument("--rgb_depth_da", default=False, action="store_true", help="Do DA on rgb/depth backbone")
-    parser.add_argument("--channels_last", default=False, action="store_true")
-    parser.add_argument("--freeze_scene", default=False, action="store_true", help="Freeze the scene backbone")
-    parser.add_argument("--freeze_face", default=False, action="store_true", help="Freeze the head backbone")
-    parser.add_argument("--freeze_depth", default=False, action="store_true", help="Freeze the depth backbone")
-    args = parser.parse_args()
 
-    # Print configuration
-    print(vars(args))
-    print()
 
-    return args
 if __name__ == "__main__":
 
     # Make runs repeatable as much as possible
@@ -148,7 +129,9 @@ if __name__ == "__main__":
     random.seed(1)
     np.random.seed(1)
     load_dotenv()
-    obj = Inference()
+    MODEL_PATH = './output/spatial_depth_late_fusion_gazefollow_gazefollow/default/ckpt_epoch_41.pth'
+    obj = Inference(MODEL_PATH)
+
 
     data_dir = '../../dataset/subsample/images'
     csv_path = '../../dataset/subsample/person1.txt'
