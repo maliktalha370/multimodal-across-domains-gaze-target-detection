@@ -119,7 +119,85 @@ class Inference:
         ending_point = (int(norm_p[0] * img_cp.shape[1]), int(norm_p[1] * img_cp.shape[0]))
 
         return starting_point, ending_point
+    def makeBatch(self, img, depth, cmbHeadBox):
+        head_list = []
+        depth_list = []
+        frame_list = []
+        face_list =[]
+        for iter, head_box in enumerate(cmbHeadBox):
+            img_cp = img.copy()
+            depth_cp = depth.copy()
+            x_min = head_box[0]
+            y_min = head_box[1]
+            x_max = head_box[2]
+            y_max = head_box[3]
 
+            img_cp = img_cp.convert("RGB")
+            width, height = img_cp.size
+
+            # Expand face bbox a bit
+            x_min -= self.head_bbox_overflow_coeff * abs(x_max - x_min)
+            y_min -= self.head_bbox_overflow_coeff * abs(y_max - y_min)
+            x_max += self.head_bbox_overflow_coeff * abs(x_max - x_min)
+            y_max += self.head_bbox_overflow_coeff * abs(y_max - y_min)
+
+            x_min, y_min, x_max, y_max = map(float, [x_min, y_min, x_max, y_max])
+
+            head = get_head_mask(x_min, y_min, x_max, y_max, width, height, resolution=self.input_size).unsqueeze(0)
+
+            # Crop the face
+            face = img_cp.crop((int(x_min), int(y_min), int(x_max), int(y_max)))
+
+            # Load depth image
+            depth_cp = depth_cp.convert("L")
+
+            # Apply transformation to images...
+            if self.image_transform is not None:
+                img_cp = self.image_transform(img_cp)
+                face = self.image_transform(face)
+
+            # ... and depth
+            if self.depth_transform is not None:
+                depth_cp = self.depth_transform(depth_cp)
+            head_list.append(head)
+            depth_list.append(depth_cp)
+            frame_list.append(img_cp)
+            face_list.append(face)
+
+
+
+        return head_list, frame_list, depth_list, face_list
+
+
+
+    def runOverBatch(self, img, depth, cmbHeadBox):
+        img_cp = np.array(img.copy())
+        head, img, depth, face = self.makeBatch(img, depth, cmbHeadBox)
+        
+        head = torch.stack(head)
+        img = torch.stack(img)
+        depth = torch.stack(depth)
+        face = torch.stack(face)
+
+
+        img = img.to(self.device, non_blocking=True, memory_format=get_memory_format(self.config))
+        depth = depth.to(self.device, non_blocking=True, memory_format=get_memory_format(self.config))
+        face = face.to(self.device, non_blocking=True, memory_format=get_memory_format(self.config))
+        head = head.to(self.device, non_blocking=True, memory_format=get_memory_format(self.config))
+
+        gaze_heatmap_pred, _, _, _ = self.model(img, depth, head, face)
+
+        gaze_heatmap_pred = gaze_heatmap_pred.squeeze(1).cpu()
+        return_pnts = []
+        for gaze, head_box in zip(gaze_heatmap_pred, cmbHeadBox):
+            pred_x, pred_y = get_heatmap_peak_coords(gaze)
+            norm_p = torch.tensor([pred_x / float(self.config.output_size), pred_y / float(self.config.output_size)])
+    
+            converted = list(map(int, head_box))
+            starting_point = ((converted[0] + converted[2]) // 2, (converted[1] + converted[3]) // 2)
+            ending_point = (int(norm_p[0] * img_cp.shape[1]), int(norm_p[1] * img_cp.shape[0]))
+            return_pnts.append([starting_point, ending_point])
+        return return_pnts
 
 
 if __name__ == "__main__":
@@ -133,27 +211,57 @@ if __name__ == "__main__":
     obj = Inference(MODEL_PATH)
 
 
-    data_dir = '../../dataset/subsample/images'
-    csv_path = '../../dataset/subsample/person1.txt'
+    IMAGE_DIR = '../../dataset/elm_gaze/images/'
+    csv_path = '../../dataset/elm_gaze/all_heads.txt'
 
     column_names = [
-        "path",
+        "frame",
         "left",
         "top",
         "right",
         "bottom"]
 
     df = pd.read_csv(csv_path, sep=",", names=column_names, usecols=column_names, index_col=False)
-    for i in df.index:
-        path = df.loc[i, 'path']
-        img = Image.open(os.path.join(data_dir, path))
-        depth_path = path.replace("images", "depth")
-        depth = Image.open(os.path.join(data_dir, depth_path))
-        head_bbox = [df.loc[i, 'left'], df.loc[i, 'top'], df.loc[i, 'right'],df.loc[i, 'bottom']]
-        start_pnt, end_pnt = obj.run_overSingleFrame(img, depth, head_bbox)
-        img_cp = np.array(img.copy())
-        cv2.line(img_cp, start_pnt, end_pnt, (255, 0, 0), 10)
-        cv2.circle(img_cp, end_pnt, 12, (255, 0, 0), -1)
+    df_grpd = df.reset_index().groupby(['frame'])
+    for ind, row in df_grpd:
+        cmb_head_bbox = []
+        for d in row.index.tolist():
+            cmb_head_bbox.append([row.loc[d, 'left'],
+                                  row.loc[d, 'top'],
+                                  row.loc[d, 'right'],
+                                  row.loc[d, 'bottom']])
+
+        frame_raw = Image.open(os.path.join(IMAGE_DIR, ind))
+        depth_path = IMAGE_DIR.replace("images", "depth")
+        depth = Image.open(os.path.join(depth_path, ind))
+        return_pnts = obj.runOverBatch(frame_raw, depth, cmb_head_bbox)
+        img_cp = np.array(frame_raw)
+
+        for starting_point, ending_point in return_pnts:
+            # print(starting_point, ending_point)
+            if starting_point != None and ending_point != None:
+                # r = random.randint(0, 255)
+                # g = random.randint(0, 255)
+                # b = random.randint(0, 255)
+                b = 255;
+                g = 0;
+                r = 0
+                cv2.line(img_cp, tuple(map(int, starting_point)), tuple(map(int, ending_point)), (b, g, r), 5)
+                cv2.circle(img_cp, tuple(map(int, ending_point)), 15,
+                           (b, g, r), -1)
         plt.imshow(img_cp, cmap='gray')
         plt.show()
+
+    # for i in df.index:
+    #     path = df.loc[i, 'path']
+    #     img = Image.open(os.path.join(data_dir, path))
+    #     depth_path = path.replace("images", "depth")
+    #     depth = Image.open(os.path.join(data_dir, depth_path))
+    #     head_bbox = [df.loc[i, 'left'], df.loc[i, 'top'], df.loc[i, 'right'],df.loc[i, 'bottom']]
+    #     start_pnt, end_pnt = obj.run_overSingleFrame(img, depth, head_bbox)
+    #     img_cp = np.array(img.copy())
+    #     cv2.line(img_cp, start_pnt, end_pnt, (255, 0, 0), 10)
+    #     cv2.circle(img_cp, end_pnt, 12, (255, 0, 0), -1)
+    #     plt.imshow(img_cp, cmap='gray')
+    #     plt.show()
     print('All images successfully completed !!!!!')
