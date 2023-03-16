@@ -18,11 +18,11 @@ def get_config():
     # Dataset args
     parser.add_argument("--input_size", type=int, default=224, help="input size")
     parser.add_argument("--output_size", type=int, default=64, help="output size")
-    parser.add_argument("--batch_size", type=int, default=48, help="batch size")
+    parser.add_argument("--batch_size", type=int, default=16, help="batch size")
     parser.add_argument(
         "--source_dataset_dir",
         type=str,
-        default="../../dataset/gazefollow/",
+        default="../../elm_Dataset/",
         help="directory where the source dataset is located",
     )
     parser.add_argument(
@@ -34,7 +34,7 @@ def get_config():
     parser.add_argument(
         "--target_dataset_dir",
         type=str,
-        default="../../dataset/gazefollow/",
+        default="../../elm_Dataset/",
         help="directory where the target dataset is located",
     )
     parser.add_argument(

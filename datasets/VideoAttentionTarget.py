@@ -291,7 +291,7 @@ class VideoAttentionTargetImages(Dataset):
         gaze_coords = (gaze_x, gaze_y)
 
         return (
-            path,
+
             img,
             depth,
             face,
