@@ -341,3 +341,4 @@ pretrained/
 
 *.jpg
 config.py
+ __pycache__/

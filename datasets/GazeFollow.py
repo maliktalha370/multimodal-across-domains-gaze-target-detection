@@ -19,7 +19,7 @@ from utils import get_head_mask, get_label_map
 
 
 class GazeFollow(Dataset):
-    def __init__(self, data_dir, labels_path, input_size=224, output_size=64, is_test_set=False):
+    def __init__(self, data_dir, labels_path, infer, input_size=224, output_size=64, is_test_set=False):
         self.data_dir = data_dir
         self.input_size = input_size
         self.output_size = output_size
@@ -73,7 +73,7 @@ class GazeFollow(Dataset):
                 ["bbox_x_min", "bbox_y_min", "bbox_x_max", "bbox_y_max", "eye_x", "eye_y", "gaze_x", "gaze_y", "inout"]
             ]
             self.length = len(df)
-
+        self.infer = infer
     def __getitem__(self, index):
         if self.is_test_set:
             return self.__get_test_item__(index)
@@ -270,7 +270,21 @@ class GazeFollow(Dataset):
                 gaze_heatmap, [gaze_x * self.output_size, gaze_y * self.output_size], 3, pdf="Gaussian"
             )
         gaze_heatmap /= num_valid
-
+        if self.infer:
+            return (
+                path,
+                img,
+                depth,
+                face,
+                head,
+                gaze_heatmap,
+                _,
+                gaze_coords,
+                gaze_inside
+                ,
+                torch.IntTensor([width, height]),
+                [x_min, y_min, x_max, y_max]
+            )
         return (
             img,
             depth,
@@ -282,6 +296,7 @@ class GazeFollow(Dataset):
             gaze_inside,
             torch.IntTensor([width, height]),
             [x_min, y_min, x_max, y_max]
+
         )
 
     def get_head_coords(self, path):

@@ -38,7 +38,7 @@ def main(config):
 
     # Load train and validation datasets
     print("Loading dataset")
-    source_loader, target_loader, target_test_loader = get_dataset(config)
+    source_loader, target_loader, target_test_loader = get_dataset(config, infer=True)
 
     # Define device
     device = torch.device(config.device)
@@ -140,10 +140,12 @@ def evaluate_one_item(path,
     starting_point = ((converted[0] + converted[2]) // 2, (converted[1] + converted[3]) // 2)
     ending_point = (int(norm_p[0] * new_img.shape[1]), int(norm_p[1] * new_img.shape[0]))
     cv2.line(dst, starting_point, ending_point, (255, 0, 0), 5)
-    plt.imshow(dst, cmap='gray')
-    plt.show()
+    # plt.imshow(dst, cmap='gray')
+    # plt.show()
     screen = cv2.cvtColor(dst, cv2.COLOR_RGB2BGR)
-    # cv2.imwrite('results/VideoAtten/' + str(batch_no) + '_' + str(b_i) + '.jpg', screen)
+    # cv2.imshow('img', screen)
+
+    cv2.imwrite('results/GazeFollow_FT_custom/' + str(batch_no) + '_' + str(b_i) + '.jpg', screen)
 
 
 

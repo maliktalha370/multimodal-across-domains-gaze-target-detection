@@ -20,7 +20,7 @@ from utils import get_head_mask, get_label_map
 
 
 class VideoAttentionTargetImages(Dataset):
-    def __init__(self, data_dir, labels_dir, input_size=224, output_size=64, is_test_set=False):
+    def __init__(self, data_dir, labels_dir, infer, input_size=224, output_size=64, is_test_set=False):
         self.data_dir = data_dir
         self.input_size = input_size
         self.output_size = output_size
@@ -56,7 +56,7 @@ class VideoAttentionTargetImages(Dataset):
                 self.X.extend(df.values.tolist())
 
         self.length = len(self.X)
-
+        self.infer = infer
         print(f"Total images: {self.length} (is test set? {is_test_set})")
 
     def __getitem__(self, index):
@@ -289,6 +289,20 @@ class VideoAttentionTargetImages(Dataset):
 
         eye_coords = (eye_x, eye_y)
         gaze_coords = (gaze_x, gaze_y)
+        if self.infer:
+            return (
+                path,
+                img,
+                depth,
+                face,
+                head,
+                gaze_heatmap,
+                torch.FloatTensor([eye_coords]),
+                torch.FloatTensor([gaze_coords]),
+                torch.IntTensor([gaze_inside]),
+                torch.IntTensor([width, height]),
+                [x_min, y_min, x_max, y_max]
+            )
 
         return (
 
